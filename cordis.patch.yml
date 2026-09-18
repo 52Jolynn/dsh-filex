@@ -1,0 +1,6 @@
+# dsh-filex bundle patch: registers the plugin into the dsh bundle.
+# The row id must match the exported cordis `name`.
+- insert:
+    - id: dsh-filex
+      name: 'dsh-filex'
+      config: {}
