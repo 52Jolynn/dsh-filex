@@ -1,21 +1,9 @@
 import { readFile } from "node:fs/promises";
 
+import { analyzePdfType } from "pdf-efficient-loader";
+
 import type { PdfExtractResult, PdfType } from "../types.js";
-import { getPdfInspector, getPdfOxide } from "../util/wasm-init.js";
-
-const SCANNED_TYPES: ReadonlySet<string> = new Set(["Scanned", "ImageBased"]);
-
-function normalisePdfType(raw: string): PdfType {
-  switch (raw) {
-    case "TextBased":
-    case "Scanned":
-    case "ImageBased":
-    case "Mixed":
-      return raw;
-    default:
-      return "Unknown";
-  }
-}
+import { getPdfOxide } from "../util/wasm-init.js";
 
 const SCAN_WARNING =
   "PDF is scanned/image-based; no text layer to extract. Run an OCR pass first " +
@@ -24,50 +12,33 @@ const SCAN_WARNING =
 /**
  * Classify a PDF and, when it contains a usable text layer, extract Markdown.
  *
- * Decision tree:
- *   - Scanned / ImageBased  → return `{markdown: null, warning}` (domain signal,
- *     not an error — the model can branch on `pdf_type`).
- *   - Mixed                 → prefer pdf-inspector's own markdown when present
- *     (better table/heading detection than the rust fallback), otherwise fall
- *     back to pdf-oxide-wasm. Always include a `warning` listing the OCR-only
- *     pages so the caller knows the extraction is partial.
- *   - TextBased / Unknown   → use pdf-oxide-wasm; warn on `Unknown` because
- *     `processPdf` couldn't categorise the file confidently.
+ * Classification uses `pdf-efficient-loader` (pure JS, pdfjs-dist based —
+ * replaces @firecrawl/pdf-inspector-wasm, whose wasm glue crashed the Node
+ * process with a fatal OOM during exit teardown):
+ *   - scan            → `{markdown: null, pdf_type: "Scanned", warning}` (domain
+ *     signal, not an error — the model can branch on `pdf_type`).
+ *   - text / vector   → extract Markdown via pdf-oxide-wasm. Vector PDFs carry
+ *     a real text layer, so they extract fine.
+ *
+ * Note: the previous inspector also detected per-page "Mixed" documents and
+ * reported `pages_needing_ocr`; pdf-efficient-loader only classifies the whole
+ * document, so mixed text/scanned PDFs degrade to TextBased and scanned pages
+ * are silently skipped by the text extractor.
  */
 export async function extractPdf(filePath: string): Promise<PdfExtractResult> {
-  const bytes = new Uint8Array(await readFile(filePath));
+  const analysis = await analyzePdfType(filePath);
+  const pdfType: PdfType = analysis.type === "scan" ? "Scanned" : "TextBased";
 
-  const inspector = await getPdfInspector();
-  const classification = inspector.processPdf(bytes);
-  const pdfType = normalisePdfType(classification.pdfType);
-
-  if (SCANNED_TYPES.has(pdfType)) {
+  if (pdfType === "Scanned") {
     return {
       markdown: null,
       pdf_type: pdfType,
       warning: SCAN_WARNING,
-      page_count: undefined,
+      page_count: analysis.stats.totalPages,
     };
   }
 
-  // Mixed: prefer inspector's own markdown (better structure), fall back to pdf-oxide.
-  if (pdfType === "Mixed") {
-    if (typeof classification.markdown === "string" && classification.markdown.length > 0) {
-      const ocrPages = classification.pages_needing_ocr;
-      const warning =
-        ocrPages && ocrPages.length > 0
-          ? `Mixed PDF: pages [${ocrPages.join(", ")}] have no text layer and were skipped.`
-          : null;
-      return {
-        markdown: classification.markdown,
-        pdf_type: "Mixed",
-        warning,
-        page_count: undefined,
-      };
-    }
-    // Fall through to pdf-oxide extraction below; if even that fails, return domain-level null.
-  }
-
+  const bytes = new Uint8Array(await readFile(filePath));
   const pdfOxide = await getPdfOxide();
   const doc = new pdfOxide.WasmPdfDocument(bytes);
   try {
@@ -76,7 +47,7 @@ export async function extractPdf(filePath: string): Promise<PdfExtractResult> {
     return {
       markdown,
       pdf_type: pdfType,
-      warning: pdfType === "Unknown" ? "PDF type could not be classified confidently; extraction is best-effort." : null,
+      warning: null,
       page_count: pageCount,
     };
   } finally {

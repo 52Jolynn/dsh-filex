@@ -411,15 +411,16 @@ function emitSheetTable(sheet: ContentSheet, out: string[]): void {
     if (r > maxRow) maxRow = r;
     if (c > maxCol) maxCol = c;
   }
-  if (maxRow === 0 && maxCol === 0) {
+  if (rows.size === 0) {
     out.push("*(empty sheet)*");
     return;
   }
 
+  // Cell row/column coordinates are 0-based (document-schema.js convention).
   const matrix: string[][] = [];
-  for (let r = 1; r <= maxRow; r++) {
+  for (let r = 0; r <= maxRow; r++) {
     const row: string[] = [];
-    for (let c = 1; c <= maxCol; c++) {
+    for (let c = 0; c <= maxCol; c++) {
       row.push(rows.get(r)?.get(c) ?? "");
     }
     matrix.push(row);

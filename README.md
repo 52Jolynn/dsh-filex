@@ -102,6 +102,9 @@ cat cordis.yml
 
 # 3. 启动 dsh web 并挂载本插件（在 dsh 仓库根目录）
 pnpm dsh web --patch /home/micray/workspace/node/dsh-filex/cordis.yml
+或者
+pnpm dsh plugin --profile web remove dsh-filex
+pnpm dsh plugin --profile web add ~/workspace/node/dsh-filex/ -w
 ```
 
 启动后：

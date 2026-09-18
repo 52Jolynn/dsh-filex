@@ -11,8 +11,10 @@
  * `pdf-oxide-wasm` may or may not expose a default `init` export; we handle
  * both shapes by checking for the export before calling it.
  *
- * `@firecrawl/pdf-inspector-wasm` always requires an explicit `init()` before
- * `processPdf` / `detectPdf` can be used.
+ * PDF type classification (scanned vs text) used to live here too, backed by
+ * `@firecrawl/pdf-inspector-wasm`; it moved to `pdf-efficient-loader` (pure JS)
+ * in src/extractors/pdf.ts because the inspector's wasm glue crashed the Node
+ * process with a fatal OOM during exit teardown.
  */
 
 export interface OfficeWasmModule {
@@ -38,40 +40,6 @@ export function getOfficeWasm(): Promise<OfficeWasmModule> {
     return mod;
   })();
   return officeCache;
-}
-
-export interface PdfInspectorModule {
-  processPdf: (
-    bytes: Uint8Array,
-    options?: Record<string, unknown>,
-  ) => {
-    pdfType: "TextBased" | "Scanned" | "ImageBased" | "Mixed" | string;
-    markdown?: string | null;
-    pages_needing_ocr?: number[];
-    [key: string]: unknown;
-  };
-  detectPdf?: (
-    bytes: Uint8Array,
-    options?: Record<string, unknown>,
-  ) => { pdfType: string };
-  version?: () => string;
-}
-
-let inspectorCache: Promise<PdfInspectorModule> | null = null;
-export function getPdfInspector(): Promise<PdfInspectorModule> {
-  if (inspectorCache) return inspectorCache;
-  inspectorCache = (async () => {
-    const initMod: unknown = await import("@firecrawl/pdf-inspector-wasm");
-    // The package ships a default `init` export. Wrap the call to discard the
-    // returned `InitOutput` shape — we don't need its payload.
-    const maybeInit = (initMod as { default?: unknown }).default;
-    if (typeof maybeInit === "function") {
-      await (maybeInit as () => Promise<unknown>)();
-    }
-    const mod = initMod as PdfInspectorModule;
-    return mod;
-  })();
-  return inspectorCache;
 }
 
 // Use `unknown` for the pdf-oxide-wasm module — its actual constructor

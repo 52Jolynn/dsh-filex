@@ -28,14 +28,16 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "fixtures": "tsx tests/fixtures/generate.ts",
     "dump-config": "cd ../${HARNESS_DIR:-deepseek-harness} && node --import tsx/esm apps/cli/src/bin.ts --profile web --dump-config --patch \"$INIT_CWD/cordis.yml\""
   },
   "dependencies": {
-    "@firecrawl/pdf-inspector-wasm": "^1.20.0",
     "htmlparser2": "^12.0.0",
     "jszip": "^3.10.1",
     "odf.js": "^7.25.5",
     "office-oxide-wasm": "^0.1.8",
+    "pdf-efficient-loader": "^1.0.0",
     "pdf-oxide-wasm": "^0.3.77"
   },
   "peerDependencies": {
@@ -51,10 +53,13 @@
     "@deepseek-ai/dsh-session": "0.1.2-rc.1",
     "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
     "@deepseek-ai/dsh-util-values": "0.1.2-rc.1",
+    "@napi-rs/canvas": "^1.0.9",
     "@types/node": "^22.10.0",
     "document-schema.js": "7.11.3",
     "domhandler": "^6.0.1",
+    "pdf-lib": "^1.17.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.1"
   }
 }

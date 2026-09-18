@@ -2,3 +2,6 @@ allowBuilds:
   esbuild: true
 
 dedupePeerDependents: true
+
+patchedDependencies:
+  office-oxide-wasm@0.1.8: patches/office-oxide-wasm@0.1.8.patch

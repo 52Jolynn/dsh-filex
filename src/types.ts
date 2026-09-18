@@ -19,12 +19,11 @@ export interface OfficeExtractResult {
   warning: string | null;
 }
 
-export type PdfType =
-  | "TextBased"
-  | "Scanned"
-  | "ImageBased"
-  | "Mixed"
-  | "Unknown";
+/**
+ * PDF classification result. `pdf-efficient-loader` distinguishes scan vs
+ * text/vector; we surface that as Scanned vs TextBased.
+ */
+export type PdfType = "TextBased" | "Scanned";
 
 export interface PdfExtractResult {
   markdown: string | null;

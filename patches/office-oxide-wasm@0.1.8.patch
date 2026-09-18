@@ -1,0 +1,33 @@
+diff --git a/node/office_oxide.js b/node/office_oxide.js
+index 65dfba438d70f66fb8a40b061ebbfe90941cb596..0cd86bc7c29d1d155087020b3659cfee139c703e 100644
+--- a/node/office_oxide.js
++++ b/node/office_oxide.js
+@@ -1,4 +1,8 @@
+ /* @ts-self-types="./office_oxide.d.ts" */
++// PATCH: convert the node entry from CommonJS to ESM. Upstream ships CJS code
++// (exports/require/__dirname) while package.json declares "type": "module",
++// which makes `import("office-oxide-wasm")` fail under Node/tsx.
++import { readFileSync } from "node:fs";
+ 
+ /**
+  * A parsed Office document for use in JavaScript/WASM.
+@@ -141,7 +145,7 @@ class WasmDocument {
+     }
+ }
+ if (Symbol.dispose) WasmDocument.prototype[Symbol.dispose] = WasmDocument.prototype.free;
+-exports.WasmDocument = WasmDocument;
++export { WasmDocument };
+ function __wbg_get_imports() {
+     const import0 = {
+         __proto__: null,
+@@ -324,8 +328,8 @@ if (!('encodeInto' in cachedTextEncoder)) {
+ 
+ let WASM_VECTOR_LEN = 0;
+ 
+-const wasmPath = `${__dirname}/office_oxide_bg.wasm`;
+-const wasmBytes = require('fs').readFileSync(wasmPath);
++const wasmPath = `${import.meta.dirname}/office_oxide_bg.wasm`;
++const wasmBytes = readFileSync(wasmPath);
+ const wasmModule = new WebAssembly.Module(wasmBytes);
+ let wasmInstance = new WebAssembly.Instance(wasmModule, __wbg_get_imports());
+ let wasm = wasmInstance.exports;

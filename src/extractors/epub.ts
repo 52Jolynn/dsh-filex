@@ -79,9 +79,24 @@ function parseContentOpf(xml: string): EpubInternal {
     language: undefined,
   };
 
+  // OPF sections live under the <package> root element (standard EPUB 2/3);
+  // some non-standard files place them directly at the document root. Handle
+  // both shapes by flattening one level.
+  const sections: XmlElement[] = [];
   for (const node of dom.children) {
     const tag = asElement(node);
     if (!tag) continue;
+    if (tag.name.toLowerCase() === "package") {
+      for (const child of tag.children ?? []) {
+        const el = asElement(child);
+        if (el) sections.push(el);
+      }
+    } else {
+      sections.push(tag);
+    }
+  }
+
+  for (const tag of sections) {
     const tagName = tag.name.toLowerCase();
     const children = tag.children ?? [];
 

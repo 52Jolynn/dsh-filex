@@ -2,13 +2,11 @@ import * as path from "node:path";
 import { readFile } from "node:fs/promises";
 import { parsePackage } from "odf.js";
 import {
-  readOdt,
-  readOdp,
-  readOds,
-  readOdg,
+  readOdtContent,
+  readOdpContent,
+  readOdsContent,
+  readOdgContent,
 } from "odf.js";
-
-import type { DocumentTree as OdfDocument } from "document-schema.js";
 
 import type {
   OdfExtractResult,
@@ -16,7 +14,6 @@ import type {
   OdfMetadata,
 } from "../types.js";
 import { odfDocumentToMarkdown } from "../util/markdown-adapter.js";
-import type { OdfKind } from "../util/markdown-adapter.js";
 
 export class UnsupportedOdfExtension extends Error {
   constructor(public readonly ext: string) {
@@ -44,41 +41,42 @@ export function odfFormatFromExt(extOrPath: string): OdfFormat {
 /**
  * Read an ODF file and convert it to Markdown via `odf.js`.
  *
- * The reader returns a `DocumentTree` whose `kind` discriminates the four
- * ODF formats. We hand the tree straight to `odfDocumentToMarkdown`, which
- * walks whichever child collection the kind exposes (sections / sheets /
- * slides / pages) and emits Markdown accordingly.
+ * The `*Content` readers return the flat `ContentDocument` level (sections /
+ * sheets / slides / pages + metadata) — the shape `odfDocumentToMarkdown`
+ * walks. The plain `readOdt`/`readOds`/… variants return the hierarchical
+ * `DocumentTree` (`children` groups), which does NOT match the adapter and
+ * silently yields empty Markdown.
  */
 export async function extractOdf(filePath: string): Promise<OdfExtractResult> {
   const format = odfFormatFromExt(path.extname(filePath));
   const bytes = new Uint8Array(await readFile(filePath));
 
   const pkg = parsePackage(bytes);
-  let tree: OdfDocument;
+  let doc: ContentDocumentLike;
   switch (format) {
     case "odt":
-      tree = readOdt(pkg) as unknown as OdfDocument;
+      doc = readOdtContent(pkg) as unknown as ContentDocumentLike;
       break;
     case "odp":
-      tree = readOdp(pkg) as unknown as OdfDocument;
+      doc = readOdpContent(pkg) as unknown as ContentDocumentLike;
       break;
     case "ods":
-      tree = readOds(pkg) as unknown as OdfDocument;
+      doc = readOdsContent(pkg) as unknown as ContentDocumentLike;
       break;
     case "odg":
-      tree = readOdg(pkg) as unknown as OdfDocument;
+      doc = readOdgContent(pkg) as unknown as ContentDocumentLike;
       break;
   }
 
   const markdown = odfDocumentToMarkdown({
-    kind: tree.kind as OdfKind,
-    sections: (tree as unknown as { sections?: unknown }).sections as never,
-    sheets: (tree as unknown as { sheets?: unknown }).sheets as never,
-    slides: (tree as unknown as { slides?: unknown }).slides as never,
-    pages: (tree as unknown as { pages?: unknown }).pages as never,
+    kind: format === "odt" ? "wordprocessing" : format === "ods" ? "spreadsheet" : format === "odp" ? "presentation" : "drawing",
+    sections: doc.sections as never,
+    sheets: doc.sheets as never,
+    slides: doc.slides as never,
+    pages: doc.pages as never,
   });
 
-  const meta = (tree as unknown as { metadata?: LayoutMetadataLike }).metadata;
+  const meta = doc.metadata;
   const metadata: OdfMetadata | undefined = meta
     ? {
         title: meta.title ?? undefined,
@@ -92,6 +90,15 @@ export async function extractOdf(filePath: string): Promise<OdfExtractResult> {
     warning: markdown.length === 0 ? "ODF document parsed but produced no extractable text." : null,
     metadata,
   };
+}
+
+/** Minimal structural view of odf.js's flat `ContentDocument`. */
+interface ContentDocumentLike {
+  sections?: unknown[];
+  sheets?: unknown[];
+  slides?: unknown[];
+  pages?: unknown[];
+  metadata?: LayoutMetadataLike;
 }
 
 interface LayoutMetadataLike {
